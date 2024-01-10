@@ -1,7 +1,8 @@
 # typed: ignore
 module Api
+  include ArticleService
   class ArticlesController < BaseController
-    before_action :doorkeeper_authorize!, only: [:publish]
+    before_action :doorkeeper_authorize!, only: [:publish, :create_draft]
 
     def publish
       begin
@@ -23,8 +24,6 @@ module Api
         end
       end
     end
-
-    before_action :doorkeeper_authorize!
 
     def index
       user_id = params.require(:user_id)
@@ -48,6 +47,34 @@ module Api
       render json: { articles: articles_with_details, total_items: articles.size, total_pages: 1 }
     rescue Pundit::NotAuthorizedError
       base_render_unauthorized_error
+    end
+
+    def create_draft
+      title = params.require(:title)
+      content = params.require(:content)
+      user_id = params.require(:user_id)
+
+      # Authenticate the user and ensure they have permission to save drafts.
+      user = User.find(user_id)
+      authorize user, policy_class: ArticlePolicy
+
+      # Save the draft using the SaveDraft service.
+      draft_id = SaveDraft.new.call(user_id: user_id, title: title, content: content, status: 'draft')
+
+      # Return the draft ID and success message.
+      render json: { status: 200, message: "Draft saved successfully.", draft_id: draft_id }, status: :ok
+    rescue Pundit::NotAuthorizedError
+      render json: { error: "User does not have permission to save drafts." }, status: :forbidden
+    rescue StandardError => e
+      # Handle any other errors by rendering an appropriate JSON response.
+      case e.message
+      when I18n.t('errors.user.not_found'), I18n.t('errors.user.permission_denied'),
+           I18n.t('validation.title.blank'), I18n.t('validation.content.blank'),
+           I18n.t('validation.status.invalid')
+        render json: { error: e.message }, status: :unprocessable_entity
+      else
+        render json: { error: e.message }, status: :internal_server_error
+      end
     end
   end
 end
