@@ -1,5 +1,6 @@
+
 # typed: ignore
-require_relative '../../services/user_authentication_service'
+require_relative '../services/user_authentication_service'
 module Api
   class BaseController < ActionController::API
     include ActionController::Cookies
