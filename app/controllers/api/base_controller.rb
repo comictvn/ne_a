@@ -1,4 +1,5 @@
 # typed: ignore
+require_relative '../../services/user_authentication_service'
 module Api
   class BaseController < ActionController::API
     include ActionController::Cookies
@@ -60,6 +61,29 @@ module Api
       @created_at = resource.created_at
       @refresh_token_expires_in = token.refresh_expires_in
       @scope = token.scopes
+    end
+
+    def authenticate(username, password)
+      result = UserAuthenticationService.new.authenticate(username, password)
+
+      if result[:token]
+        render json: {
+          status: 200,
+          message: "User authenticated successfully.",
+          access_token: result[:token]
+        }, status: :ok
+      elsif result[:error]
+        error_message = result[:error]
+        status_code = case error_message
+                      when 'Username cannot be empty', 'Password cannot be empty'
+                        :bad_request
+                      else
+                        :unauthorized
+                      end
+        render json: { message: error_message }, status: status_code
+      end
+    rescue => e
+      render json: { message: e.message }, status: :internal_server_error
     end
 
     def current_resource_owner
