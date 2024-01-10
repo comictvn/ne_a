@@ -1,6 +1,6 @@
 
 # This migration comes from active_storage (originally 20170806125915) - version 2
-class RenameActiveStorageTables < ActiveRecord::Migration[5.2]
+class CreateActiveStorageTables < ActiveRecord::Migration[5.2]
   def change
     return if table_exists?(:active_storage_blobs)
 
