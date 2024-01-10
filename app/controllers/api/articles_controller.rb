@@ -1,6 +1,29 @@
 # typed: ignore
 module Api
   class ArticlesController < BaseController
+    before_action :doorkeeper_authorize!, only: [:publish]
+
+    def publish
+      begin
+        article_id = params[:id]
+        raise 'Wrong format.' unless article_id.is_a?(Numeric)
+
+        result = ArticleService::Publish.new(article_id, current_resource_owner).publish_article
+        render json: { status: 200, message: result, article_id: article_id }
+      rescue ActiveRecord::RecordNotFound
+        render json: { error: 'This article is not found.' }, status: :not_found
+      rescue Pundit::NotAuthorizedError
+        render json: { error: 'User does not have permission to publish the article.' }, status: :forbidden
+      rescue StandardError => e
+        case e.message
+        when 'Wrong format.'
+          render json: { error: e.message }, status: :unprocessable_entity
+        else
+          render json: { error: 'An unexpected error occurred on the server.' }, status: :internal_server_error
+        end
+      end
+    end
+
     before_action :doorkeeper_authorize!
 
     def index
