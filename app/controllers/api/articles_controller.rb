@@ -2,7 +2,38 @@
 module Api
   include ArticleService
   class ArticlesController < BaseController
-    before_action :doorkeeper_authorize!, only: [:publish, :create_draft, :add_metadata]
+    before_action :doorkeeper_authorize!, only: [:publish, :create_draft, :add_metadata, :index]
+
+    rescue_from ActiveRecord::RecordNotFound, with: :handle_user_not_found
+
+    def index
+      user_id = params[:user_id]
+
+      unless user_id.present? && User.exists?(user_id)
+        return render json: { message: "Invalid user ID." }, status: :bad_request
+      end
+
+      # Authenticate the user and ensure they have permission to manage articles.
+      user = User.find(user_id)
+      authorize user, policy_class: ArticlePolicy
+
+      # Query the "articles" table to retrieve all articles associated with the provided user_id.
+      articles = Article.includes(:metadata, :article_stats).where(user_id: user_id)
+
+      # Compile the article information, metadata, and statistics into a list.
+      articles_with_details = articles.map do |article|
+        {
+          article: article,
+          metadata: article.metadata,
+          statistics: article.article_stats
+        }
+      end
+
+      # Return the list of articles with their metadata and statistics to the user.
+      render json: { articles: articles_with_details, total_items: articles.size, total_pages: 1 }
+    rescue Pundit::NotAuthorizedError
+      base_render_unauthorized_error
+    end
 
     def publish
       begin
@@ -51,30 +82,6 @@ module Api
       render json: { error: "User does not have permission to add metadata." }, status: :forbidden
     end
 
-    def index
-      user_id = params.require(:user_id)
-      # Authenticate the user and ensure they have permission to manage articles.
-      user = User.find(user_id)
-      authorize user, policy_class: ArticlePolicy
-
-      # Query the "articles" table to retrieve all articles associated with the provided user_id.
-      articles = Article.includes(:metadata, :article_stats).where(user_id: user_id)
-
-      # Compile the article information, metadata, and statistics into a list.
-      articles_with_details = articles.map do |article|
-        {
-          article: article,
-          metadata: article.metadata,
-          statistics: article.article_stats
-        }
-      end
-
-      # Return the list of articles with their metadata and statistics to the user.
-      render json: { articles: articles_with_details, total_items: articles.size, total_pages: 1 }
-    rescue Pundit::NotAuthorizedError
-      base_render_unauthorized_error
-    end
-
     def create_draft
       title = params.require(:title)
       content = params.require(:content)
@@ -101,6 +108,12 @@ module Api
       else
         render json: { error: e.message }, status: :internal_server_error
       end
+    end
+
+    private
+
+    def handle_user_not_found
+      render json: { message: "Invalid user ID." }, status: :bad_request
     end
   end
 end
