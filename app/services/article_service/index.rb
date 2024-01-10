@@ -11,19 +11,25 @@ module ArticleService
     def retrieve_articles
       authenticate_user
 
-      articles = Article.includes(:metadatum, :article_stats).where(user_id: user_id)
+      articles = Article.includes(:metadatum, :article_stat).where(user_id: user_id)
       articles_with_details = articles.map do |article|
         {
-          article: article,
-          metadata: article.metadatum,
-          statistics: article.article_stats
+          title: article.title,
+          content: article.content,
+          status: article.status,
+          views: article.article_stat.views,
+          likes: article.article_stat.likes,
+          comments_count: article.article_stat.comments_count,
+          tags: article.metadatum.tags,
+          categories: article.metadatum.categories,
+          featured_image: article.metadatum.featured_image.attached? ? article.metadatum.featured_image.blob.service_url : nil
         }
       end
 
       {
-        articles: articles_with_details,
+        articles: articles_with_details.as_json(only: [:title, :content, :status, :views, :likes, :comments_count, :tags, :categories, :featured_image]),
         total_items: articles.size,
-        total_pages: articles.total_pages
+        total_pages: (articles.size / Article.default_per_page.to_f).ceil
       }
     rescue StandardError => e
       { error: e.message }
