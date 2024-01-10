@@ -2,7 +2,7 @@
 module Api
   include ArticleService
   class ArticlesController < BaseController
-    before_action :doorkeeper_authorize!, only: [:publish, :create_draft]
+    before_action :doorkeeper_authorize!, only: [:publish, :create_draft, :add_metadata]
 
     def publish
       begin
@@ -23,6 +23,32 @@ module Api
           render json: { error: 'An unexpected error occurred on the server.' }, status: :internal_server_error
         end
       end
+    end
+
+    def add_metadata
+      article_id = params[:article_id]
+      tags = params[:tags]
+      categories = params[:categories]
+      featured_image = params[:featured_image]
+
+      # Validate parameters
+      return render json: { error: "Invalid article ID." }, status: :bad_request unless Article.exists?(article_id)
+      return render json: { error: "Tags are required." }, status: :bad_request if tags.blank?
+      return render json: { error: "Categories are required." }, status: :bad_request if categories.blank?
+      return render json: { error: "Invalid featured image." }, status: :bad_request unless featured_image.respond_to?(:path)
+
+      # Instantiate and call the AddMetadata service
+      result = ArticleService::AddMetadata.new(current_resource_owner, article_id, tags, categories, featured_image).call
+
+      if result[:error].present?
+        render json: { error: result[:error] }, status: :unprocessable_entity
+      else
+        render json: { status: 200, message: "Metadata added successfully.", metadata_id: Metadatum.find_by(article_id: article_id).id }, status: :ok
+      end
+    rescue ActiveRecord::RecordNotFound
+      render json: { error: "Article not found." }, status: :not_found
+    rescue Pundit::NotAuthorizedError
+      render json: { error: "User does not have permission to add metadata." }, status: :forbidden
     end
 
     def index

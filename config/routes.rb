@@ -9,9 +9,10 @@ Rails.application.routes.draw do
   # Merging the new route into the existing namespace block
   namespace :api do
     post '/auth/login', to: 'base#authenticate'
-    post '/articles/drafts', to: 'articles#create_draft' # Adjusted the route to fit within the namespace
+    post '/articles/drafts', to: 'articles#create_draft'
+    post '/articles/:article_id/metadata', to: 'articles#add_metadata' # Added the new route within the namespace
   end
 
-  # Adding the new route outside of the namespace block
+  # Keeping the existing route outside of the namespace block
   put '/api/articles/:id/publish', to: 'articles#publish'
 end
