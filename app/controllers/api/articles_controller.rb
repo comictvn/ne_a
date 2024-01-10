@@ -69,6 +69,33 @@ module Api
       end
     end
 
+    def publish
+      article_id = params.require(:id)
+      user_id = params.require(:user_id)
+      tags = params[:tags]
+      categories = params[:categories]
+      featured_image = params[:featured_image]
+
+      user = User.find(user_id)
+      article = Article.find(article_id)
+
+      authorize user, policy_class: ArticlePolicy
+      authorize article, policy_class: ArticlePolicy
+
+      publish_service = ArticleService::Publish.new(article_id, user)
+      message = publish_service.publish_article
+
+      Metadatum.find_or_initialize_by(article_id: article_id).update!(
+        tags: tags,
+        categories: categories,
+        featured_image: featured_image
+      )
+
+      render json: { message: message }, status: :ok
+    rescue StandardError => e
+      render json: { error: e.message }, status: :unprocessable_entity
+    end
+
     # ... rest of the existing methods (publish, add_metadata, create_draft) ...
 
     private
