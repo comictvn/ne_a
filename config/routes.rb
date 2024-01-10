@@ -7,9 +7,10 @@ Rails.application.routes.draw do
   get 'api-docs/v1/swagger.yaml' => 'swagger#yaml'
 
   namespace :api do
-    # Existing routes from the new code
+    # Merging the new route for updating articles with the existing routes
     resources :articles, only: [] do
       get 'manage', on: :collection, to: 'articles#index'
+      put ':id', to: 'articles#update' # New route added from the new code
     end
 
     # Existing routes from the existing code
@@ -20,4 +21,5 @@ Rails.application.routes.draw do
 
   # Keeping the existing route outside of the namespace block
   put '/api/articles/:id/publish', to: 'articles#publish'
+  # ... other routes ...
 end
